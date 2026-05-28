@@ -1,13 +1,42 @@
-package com.attrsc.braincs.androidseriallibrary;
+package android.serialport.sample;
 
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.widget.TextView;
+import android.widget.Toast;
+import android.serialport.SerialPort;
+import java.io.File;
 
-public class MainActivity extends AppCompatActivity {
-
+public class MainActivity extends SerialPortActivity {
+    
+    private TextView temperatureText;
+    
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.main);
+        
+        temperatureText = findViewById(R.id.temperatureText);
+        
+        // 打开串口 /dev/ttyMT1，波特率 19200
+        try {
+            mSerialPort = new SerialPort(new File("/dev/ttyMT1"), 19200, 0);
+            temperatureText.setText("串口已打开，等待数据...");
+        } catch (Exception e) {
+            e.printStackTrace();
+            temperatureText.setText("错误：无法打开串口\n" + e.getMessage());
+            Toast.makeText(this, "串口打开失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+    
+    @Override
+    protected void onDataReceived(final byte[] buffer, final int size) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                // 收到数据时显示
+                String data = new String(buffer, 0, size);
+                temperatureText.setText("水温: " + data.trim() + " ℃");
+            }
+        });
     }
 }
