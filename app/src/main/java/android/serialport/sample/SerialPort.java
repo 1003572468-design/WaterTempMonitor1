@@ -2,16 +2,15 @@ package android.serialport.sample;
 
 import android.util.Log;
 import java.io.File;
-import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Method;
-import java.security.InvalidParameterException;   // 添加这一行
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.InvalidParameterException;
 
 public class SerialPort {
     private static final String TAG = "SerialPort";
-    private FileDescriptor mFd;
     private FileInputStream mFileInputStream;
     private FileOutputStream mFileOutputStream;
     
@@ -28,27 +27,28 @@ public class SerialPort {
             }
         }
         
-        mFd = open(device.getAbsolutePath(), baudrate, flags);
-        if (mFd == null) {
-            Log.e(TAG, "native open returns null");
-            throw new IOException();
-        }
-        mFileInputStream = new FileInputStream(mFd);
-        mFileOutputStream = new FileOutputStream(mFd);
+        mFileInputStream = new FileInputStream(device);
+        mFileOutputStream = new FileOutputStream(device);
     }
     
-    private native static FileDescriptor open(String path, int baudrate, int flags);
-    public native void close();
-    
-    public FileInputStream getInputStream() {
+    public InputStream getInputStream() {
         return mFileInputStream;
     }
     
-    public FileOutputStream getOutputStream() {
+    public OutputStream getOutputStream() {
         return mFileOutputStream;
     }
     
-    static {
-        System.loadLibrary("serial_port");
+    public void close() {
+        try {
+            if (mFileInputStream != null) {
+                mFileInputStream.close();
+            }
+            if (mFileOutputStream != null) {
+                mFileOutputStream.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
