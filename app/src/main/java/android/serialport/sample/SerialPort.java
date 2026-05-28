@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.security.InvalidParameterException;   // 添加这一行
 
 public class SerialPort {
     private static final String TAG = "SerialPort";
