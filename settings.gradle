@@ -1,1 +1,1 @@
-include ':app', ':androidserial'
+include ':app'
