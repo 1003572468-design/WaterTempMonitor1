@@ -1,24 +1,42 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdk 33
-    
+    namespace 'com.example.floatingweather'
+    compileSdk 34
+
     defaultConfig {
-        applicationId "android.serialport.sample"
+        applicationId "com.example.floatingweather"
         minSdk 21
-        targetSdk 33
+        targetSdk 34
         versionCode 1
         versionName "1.0"
     }
-    
+
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.txt'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
 }
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.10.0'
+    
+    // 网络请求库
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    
+    // JSON解析库
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
+    // 悬浮窗框架
+    implementation 'com.github.yhaolpz:FloatWindow:1.0.9'
 }
