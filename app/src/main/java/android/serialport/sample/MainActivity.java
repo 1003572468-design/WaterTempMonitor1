@@ -1,92 +1,100 @@
-package android.serialport.sample;
+package com.example.floatingweather;
 
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.widget.TextView;
+import android.provider.Settings;
 import android.widget.Toast;
-import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
 
-public class MainActivity extends SerialPortActivity {
+public class MainActivity extends AppCompatActivity {
     
-    private TextView statusText;      // 状态信息
-    private TextView dataText;        // 数据显示区
-    private Handler handler = new Handler();
-    private StringBuilder allData = new StringBuilder();  // 累积所有数据
+    private static final int REQUEST_CODE_OVERLAY = 1001;
+    private static final int REQUEST_CODE_NOTIFICATION = 1002;
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
         
-        statusText = findViewById(R.id.statusText);
-        dataText = findViewById(R.id.dataText);
-        
-        statusText.setText("正在打开串口 /dev/ttyMT1 ...");
-        
-        // 延迟1秒打开串口
-        handler.postDelayed(this::openSerialPort, 1000);
+        // 检查并申请必要权限
+        checkAndRequestPermissions();
     }
     
-    private void openSerialPort() {
-        try {
-            SerialPort serialPort = new SerialPort(new File("/dev/ttyMT1"), 19200, 0);
-            setSerialPort(serialPort);
-            statusText.setText("串口已打开，监听中...\n发动汽车后应该会收到数据");
-            dataText.setText("等待数据...\n\n提示：\n1. 请发动汽车\n2. 踩油门试试\n3. 数据会自动显示在这里");
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            statusText.setText("串口打开失败: " + e.getMessage());
-            dataText.setText("错误: " + e.toString());
-        }
-    }
-    
-    @Override
-    protected void onDataReceived(byte[] buffer, int size) {
-        final String hexData = bytesToHex(buffer, size);
-        final String asciiData = new String(buffer, 0, size);
-        
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                // 更新状态栏（显示最新收到的数据）
-                statusText.setText("收到 " + size + " 字节\nHEX: " + hexData);
-                
-                // 累积显示所有数据
-                String time = new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date());
-                allData.insert(0, "[" + time + "] " + hexData + "\n");
-                
-                // 限制显示行数（最多50行）
-                int lines = allData.toString().split("\n").length;
-                if (lines > 50) {
-                    int lastIndex = allData.lastIndexOf("\n");
-                    if (lastIndex > 0) {
-                        allData.delete(lastIndex, allData.length());
-                    }
-                }
-                
-                dataText.setText(allData.toString());
-                
-                // 同时打印到 logcat，方便用 adb 查看
-                android.util.Log.d("OBD_RAW", "HEX: " + hexData);
-                android.util.Log.d("OBD_RAW", "ASCII: " + asciiData);
+    private void checkAndRequestPermissions() {
+        // 检查悬浮窗权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (!Settings.canDrawOverlays(this)) {
+                showPermissionDialog();
+                return;
             }
-        });
+        }
+        
+        // 检查通知权限（Android 13+）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (!checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)) {
+                requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 
+                    REQUEST_CODE_NOTIFICATION);
+                return;
+            }
+        }
+        
+        // 所有权限都已授予，启动服务
+        startFloatingService();
+        finish();
     }
     
-    private String bytesToHex(byte[] bytes, int size) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < size; i++) {
-            sb.append(String.format("%02X ", bytes[i]));
+    private void showPermissionDialog() {
+        new AlertDialog.Builder(this)
+            .setTitle("需要悬浮窗权限")
+            .setMessage("悬浮窗权限用于在桌面上显示时间和天气信息。\n\n点击确定后，请在设置页面允许悬浮窗权限。")
+            .setPositiveButton("去设置", (dialog, which) -> {
+                requestOverlayPermission();
+            })
+            .setNegativeButton("退出", (dialog, which) -> {
+                finish();
+            })
+            .setCancelable(false)
+            .show();
+    }
+    
+    private void requestOverlayPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, REQUEST_CODE_OVERLAY);
         }
-        return sb.toString().trim();
     }
     
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        handler.removeCallbacksAndMessages(null);
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        
+        if (requestCode == REQUEST_CODE_OVERLAY) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (Settings.canDrawOverlays(this)) {
+                    // 权限已授予，继续检查其他权限
+                    checkAndRequestPermissions();
+                } else {
+                    Toast.makeText(this, "需要悬浮窗权限才能正常工作", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            }
+        }
+    }
+    
+    private void startFloatingService() {
+        Intent serviceIntent = new Intent(this, FloatingService.class);
+        
+        // Android 8.0+ 需要使用 startForegroundService
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        
+        Toast.makeText(this, "悬浮窗已启动", Toast.LENGTH_SHORT).show();
+        finish();
     }
 }
